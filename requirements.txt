@@ -1,0 +1,12 @@
+pyyaml
+streamlit
+openai
+psycopg2-binary
+pgvector
+langchain
+langchain-openai
+langchain-community
+pypdf2
+python-dotenv
+tiktoken
+numpy
