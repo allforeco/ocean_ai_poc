@@ -8,7 +8,7 @@ import os
 import argparse
 import yaml
 import hashlib
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 import json
 
@@ -144,7 +144,7 @@ class DocumentIngestor:
         
         return result is not None
     
-    def store_document(self, filename: str, doc_type: str, organization: str, 
+    def store_document(self, filename: str, doc_type: str, organization: Optional[str], 
                       file_size: int, metadata: Dict[str, Any]) -> int:
         """Store document metadata in database and return document ID"""
         conn = self.get_db_connection()
@@ -156,7 +156,11 @@ class DocumentIngestor:
             RETURNING id
         """, (filename, doc_type, organization, file_size, json.dumps(metadata)))
         
-        doc_id = cursor.fetchone()['id']
+        result = cursor.fetchone()
+        if result is None:
+            raise RuntimeError("Failed to insert document - no ID returned")
+        # RealDictCursor returns dict-like rows, but type checker needs help
+        doc_id = int(result[0] if isinstance(result, tuple) else result['id'])
         conn.commit()
         cursor.close()
         conn.close()
@@ -181,17 +185,17 @@ class DocumentIngestor:
         cursor.close()
         conn.close()
     
-    def ingest_document(self, file_path: str, organization: str = None, original_filename: str = None) -> bool:
+    def ingest_document(self, file_path: Union[str, Path], organization: Optional[str] = None, original_filename: Optional[str] = None) -> bool:
         """Ingest a single document"""
-        file_path = Path(file_path)
+        file_path_obj = Path(file_path)
         
-        if not file_path.exists():
-            print(f"File not found: {file_path}")
+        if not file_path_obj.exists():
+            print(f"File not found: {file_path_obj}")
             return False
         
         # Use original filename if provided, otherwise use the file path name
-        filename = original_filename if original_filename else file_path.name
-        file_size = file_path.stat().st_size
+        filename = original_filename if original_filename else file_path_obj.name
+        file_size = file_path_obj.stat().st_size
         
         # Check if document already exists
         if self.document_exists(filename, file_size):
@@ -201,15 +205,15 @@ class DocumentIngestor:
         print(f"Ingesting document: {filename}")
         
         # Extract text based on file type
-        if file_path.suffix.lower() == '.pdf':
-            text = self.extract_text_from_pdf(str(file_path))
+        if file_path_obj.suffix.lower() == '.pdf':
+            text = self.extract_text_from_pdf(str(file_path_obj))
         else:
             # For other text files
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path_obj, 'r', encoding='utf-8') as f:
                     text = f.read()
             except Exception as e:
-                print(f"Error reading file {file_path}: {e}")
+                print(f"Error reading file {file_path_obj}: {e}")
                 return False
         
         if not text.strip():
@@ -255,16 +259,16 @@ class DocumentIngestor:
         print(f"Successfully ingested {filename} with {len(chunks)} chunks")
         return True
     
-    def ingest_directory(self, directory_path: str, organization: str = None) -> int:
+    def ingest_directory(self, directory_path: Union[str, Path], organization: Optional[str] = None) -> int:
         """Ingest all supported documents in a directory"""
-        directory_path = Path(directory_path)
+        directory_path_obj = Path(directory_path)
         
-        if not directory_path.exists():
-            print(f"Directory not found: {directory_path}")
+        if not directory_path_obj.exists():
+            print(f"Directory not found: {directory_path_obj}")
             return 0
         
         supported_extensions = {'.pdf', '.txt', '.md'}
-        files = [f for f in directory_path.iterdir() 
+        files = [f for f in directory_path_obj.iterdir() 
                 if f.is_file() and f.suffix.lower() in supported_extensions]
         
         successful_ingestions = 0
