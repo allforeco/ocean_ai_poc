@@ -94,6 +94,41 @@ python database_setup.py
 
 This creates the `documents` and `chunks` tables with proper vector indexing.
 
+### 5. Database Reset (If Needed)
+
+If you need to reset the database (e.g., schema changes, corruption, or starting fresh):
+
+#### Option A: Automated Reset (Recommended)
+```bash
+python reset_db.py
+```
+
+#### Option B: Manual Reset
+```bash
+# Method 1: Drop tables only (keeps database)
+psql -d oceanai -c "DROP TABLE IF EXISTS chunks CASCADE; DROP TABLE IF EXISTS documents CASCADE;"
+python database_setup.py
+
+# Method 2: Drop entire database (nuclear option)
+dropdb oceanai
+createdb oceanai
+python database_setup.py
+```
+
+#### Option C: SQL Commands
+```sql
+-- Connect to database
+psql -d oceanai
+
+-- Drop tables
+DROP TABLE IF EXISTS chunks CASCADE;
+DROP TABLE IF EXISTS documents CASCADE;
+
+-- Exit and recreate
+\q
+python database_setup.py
+```
+
 ## Usage
 
 ### Document Ingestion
@@ -279,6 +314,19 @@ For processing many documents:
 ## Troubleshooting
 
 ### Common Issues
+
+**`psycopg2.errors.UndefinedColumn: column "doc_type" does not exist`**:
+- Database schema not initialized or incomplete
+- **Solution**: Run `python database_setup.py` to create/update tables
+- **Check**: Run `python check_db.py` to verify schema
+- **Reset if needed**: Run `python reset_db.py` to drop and recreate all tables
+- **Manual reset**:
+  ```bash
+  # Drop tables manually
+  psql -d oceanai -c "DROP TABLE IF EXISTS chunks CASCADE; DROP TABLE IF EXISTS documents CASCADE;"
+  # Recreate schema
+  python database_setup.py
+  ```
 
 **"No results found"**: 
 - Check similarity threshold (try lowering to 0.2-0.4)
